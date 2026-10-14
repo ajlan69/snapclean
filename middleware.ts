@@ -3,20 +3,23 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * Refreshes the Supabase auth session on every request so server components
- * always see an up-to-date user. Runs as Next.js middleware.
+ * always see an up-to-date user, and gates the authenticated /dashboard routes.
+ *
+ * Public routes: /, /login, /signup, /auth/callback. Everything except
+ * /dashboard is left reachable without a session.
  */
 export async function middleware(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // Without configuration there is nothing to refresh — skip gracefully.
-  if (!url || !anonKey) {
+  if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.next({ request });
   }
 
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(url, anonKey, {
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -35,7 +38,8 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  // Touch the user to trigger a token refresh when needed.
+  // IMPORTANT: use getUser() (never getSession()) so the token is validated
+  // and refreshed against Supabase on every request.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -46,7 +50,13 @@ export async function middleware(request: NextRequest) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = `?next=${encodeURIComponent(request.nextUrl.pathname)}`;
-    return NextResponse.redirect(loginUrl);
+
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    // Preserve any refreshed auth cookies on the redirect.
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie);
+    });
+    return redirectResponse;
   }
 
   return response;

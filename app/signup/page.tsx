@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Wand2 } from "lucide-react";
 
 import { AuthForm } from "@/components/AuthForm";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export const metadata: Metadata = {
@@ -31,6 +32,14 @@ export default async function SignupPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Free forever. Join the Pro waitlist any time.
           </p>
+        </div>
+
+        <GoogleSignInButton />
+
+        <div className="my-4 flex items-center gap-3">
+          <span className="h-px flex-1 bg-border" />
+          <span className="text-xs uppercase text-muted-foreground">or</span>
+          <span className="h-px flex-1 bg-border" />
         </div>
 
         <Suspense fallback={null}>
