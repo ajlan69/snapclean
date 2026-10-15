@@ -9,6 +9,16 @@ import { NextResponse, type NextRequest } from "next/server";
  * /dashboard is left reachable without a session.
  */
 export async function middleware(request: NextRequest) {
+  // NEVER touch the auth session on the OAuth/PKCE callback route. Calling
+  // getUser() here with a stale/expired session cookie triggers a failed token
+  // refresh, which tears the session down and DELETES the PKCE code-verifier
+  // cookie before the callback route can exchange the code for a session.
+  // That produced "pkce_code_verifier_not_found" and left users stuck on the
+  // login screen. Let the route handler own this request untouched.
+  if (request.nextUrl.pathname.startsWith("/auth/")) {
+    return NextResponse.next({ request });
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

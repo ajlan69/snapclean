@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Wand2 } from "lucide-react";
 
+import { AuthErrorToast } from "@/components/AuthErrorToast";
 import { AuthForm } from "@/components/AuthForm";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
@@ -36,6 +37,10 @@ export default async function LoginPage() {
         </div>
 
         <GoogleSignInButton />
+
+        <Suspense fallback={null}>
+          <AuthErrorToast />
+        </Suspense>
 
         <div className="my-4 flex items-center gap-3">
           <span className="h-px flex-1 bg-border" />
