@@ -31,14 +31,30 @@ export function GoogleSignInButton() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
+      const redirectTo = `${window.location.origin}/auth/callback`;
+      console.log("[GoogleSignIn] starting signInWithOAuth", {
+        redirectTo,
+        origin: window.location.origin,
+      });
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: { redirectTo },
       });
 
-      if (error) throw error;
+      console.log("[GoogleSignIn] signInWithOAuth response", { data, error });
+      if (error) {
+        console.error("[GoogleSignIn] signInWithOAuth error", error);
+        throw error;
+      }
+      // On success Supabase redirects the full page to Google; if `data.url`
+      // is missing the redirect never happens, so log it explicitly.
+      if (!data?.url) {
+        console.error("[GoogleSignIn] no OAuth URL returned", data);
+      } else {
+        console.log("[GoogleSignIn] redirecting to provider URL", data.url);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("[GoogleSignIn] sign-in failed", err);
       toast.error(
         err instanceof Error ? err.message : "Couldn't sign in with Google."
       );

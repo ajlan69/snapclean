@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 
+import { getAppBaseUrl } from "@/lib/app-url";
+
 /**
  * Stripe server-side client. Only used in API routes / webhooks.
  */
@@ -18,8 +20,8 @@ export const PRO_PRICE_ID = process.env.STRIPE_PRO_PRICE_ID!;
  * behave correctly across localhost and production.
  */
 export function getAppUrl(path = "/"): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+  const base = getAppBaseUrl();
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 /**

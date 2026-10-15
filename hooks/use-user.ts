@@ -13,12 +13,24 @@ export function useUser() {
 
   useEffect(() => {
     const supabase = createClient();
+    console.log("[useUser] subscribing to onAuthStateChange");
 
-    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
+    supabase.auth.getUser().then(({ data, error }) => {
+      console.log("[useUser] initial getUser", {
+        userId: data.user?.id ?? null,
+        error,
+      });
+      if (error) console.error("[useUser] initial getUser error", error);
+      setUser(data.user ?? null);
+    });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[useUser] onAuthStateChange", {
+        event,
+        userId: session?.user?.id ?? null,
+      });
       setUser(session?.user ?? null);
     });
 

@@ -1,51 +1,43 @@
-import { NextResponse } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
 
-/**
- * OAuth / magic-link callback. Supabase redirects here with a `code` query
- * parameter which we exchange for a session. The @supabase/ssr client writes
- * the resulting session cookies onto the outgoing response via `setAll`.
- */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
+  const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
-    const cookieStore = cookies();
-
+    console.log("Callback hit, exchanging code...")
+    const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return cookieStore.getAll();
+            return cookieStore.getAll()
           },
-          setAll(
-            cookiesToSet: { name: string; value: string; options: CookieOptions }[]
-          ) {
+          setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)
-              );
+              )
             } catch {
-              // `setAll` was called from a Server Component — safe to ignore
-              // because middleware refreshes the session on every request.
+              // Called from a Server Component — can be ignored
+              // when middleware refreshes the session.
             }
           },
         },
       }
-    );
-
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+    )
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) {
+      console.error("Exchange error:", error)
+      return NextResponse.redirect(`${origin}/login?error=auth`)
     }
-
-    console.error("Auth callback error:", error);
+    return NextResponse.redirect(`${origin}${next}`)
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  return NextResponse.redirect(`${origin}/login?error=auth`)
 }

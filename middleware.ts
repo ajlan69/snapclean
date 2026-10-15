@@ -25,7 +25,8 @@ export async function middleware(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(
-        cookiesToSet: { name: string; value: string; options: CookieOptions }[]
+        cookiesToSet: { name: string; value: string; options: CookieOptions }[],
+        headers: Record<string, string>
       ) {
         cookiesToSet.forEach(({ name, value }) =>
           request.cookies.set(name, value)
@@ -33,6 +34,10 @@ export async function middleware(request: NextRequest) {
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, options)
+        );
+        // CDN / proxy cache-control headers for responses that set auth cookies.
+        Object.entries(headers).forEach(([key, value]) =>
+          response.headers.set(key, value)
         );
       },
     },
@@ -56,6 +61,9 @@ export async function middleware(request: NextRequest) {
     response.cookies.getAll().forEach((cookie) => {
       redirectResponse.cookies.set(cookie);
     });
+    response.headers.forEach((value, key) => {
+      redirectResponse.headers.set(key, value);
+    });
     return redirectResponse;
   }
 
@@ -63,8 +71,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    // Run on everything except static assets and image optimization.
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:png|jpg|jpeg|svg|webp|gif|ico)$).*)",
-  ],
-};
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+}

@@ -6,7 +6,9 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Toaster } from "sonner";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+import { getAppBaseUrl } from "@/lib/app-url";
+
+const appUrl = getAppBaseUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
