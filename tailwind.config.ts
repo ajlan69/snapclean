@@ -16,6 +16,10 @@ const config: Config = {
       },
     },
     extend: {
+      screens: {
+        // Large living-room displays / TVs.
+        tv: "1920px",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

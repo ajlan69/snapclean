@@ -66,7 +66,7 @@ export function BeforeAfterSlider({
     <div
       ref={containerRef}
       className={cn(
-        "relative aspect-square w-full select-none overflow-hidden rounded-2xl border",
+        "relative aspect-square w-full touch-none select-none overflow-hidden rounded-2xl border",
         transparent && "bg-checkerboard",
         className
       )}

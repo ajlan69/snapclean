@@ -15,18 +15,25 @@ export interface Adjustments {
   saturation: number;
   /** 0–20px, 0 = unchanged */
   blur: number;
+  /** 0–100, 0 = unchanged */
+  grayscale: number;
+  /** 0–100, 0 = unchanged */
+  sepia: number;
 }
 
 export type BackgroundOption =
   | { type: "transparent" }
   | { type: "color"; color: string }
-  | { type: "gradient"; from: string; to: string };
+  | { type: "gradient"; from: string; to: string }
+  | { type: "image"; url: string };
 
 export const DEFAULT_ADJUSTMENTS: Adjustments = {
   brightness: 100,
   contrast: 100,
   saturation: 100,
   blur: 0,
+  grayscale: 0,
+  sepia: 0,
 };
 
 /**
@@ -75,6 +82,9 @@ export function buildFilter(a: Adjustments): string {
   ];
   // `blur(0px)` is a no-op, so only emit it when the user actually blurs.
   if (a.blur > 0) parts.push(`blur(${a.blur}px)`);
+  // Similarly, skip the no-op grayscale/sepia filters.
+  if (a.grayscale > 0) parts.push(`grayscale(${a.grayscale}%)`);
+  if (a.sepia > 0) parts.push(`sepia(${a.sepia}%)`);
   return parts.join(" ");
 }
 
@@ -85,6 +95,9 @@ export function buildFilter(a: Adjustments): string {
 export function backgroundToStyle(background: BackgroundOption): {
   backgroundColor?: string;
   backgroundImage?: string;
+  backgroundSize?: string;
+  backgroundPosition?: string;
+  backgroundRepeat?: string;
 } {
   if (background.type === "color") {
     return { backgroundColor: background.color };
@@ -94,13 +107,48 @@ export function backgroundToStyle(background: BackgroundOption): {
       backgroundImage: `linear-gradient(135deg, ${background.from}, ${background.to})`,
     };
   }
+  if (background.type === "image") {
+    return {
+      backgroundImage: `url("${background.url}")`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+    };
+  }
   return {};
 }
 
 /**
- * Paint the selected background behind the (transparent) subject.
+ * Draw an image scaled to completely cover a width×height box, centered
+ * (the canvas equivalent of CSS `background-size: cover`).
  */
-function paintBackground(
+function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  width: number,
+  height: number
+) {
+  const iw = image.naturalWidth || image.width;
+  const ih = image.naturalHeight || image.height;
+  if (!iw || !ih) return;
+
+  const scale = Math.max(width / iw, height / ih);
+  const drawWidth = iw * scale;
+  const drawHeight = ih * scale;
+  ctx.drawImage(
+    image,
+    (width - drawWidth) / 2,
+    (height - drawHeight) / 2,
+    drawWidth,
+    drawHeight
+  );
+}
+
+/**
+ * Paint the selected background behind the (transparent) subject.
+ * Only image backgrounds need to load an asset, so this is async.
+ */
+async function paintBackground(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
@@ -111,6 +159,15 @@ function paintBackground(
   if (background.type === "color") {
     ctx.fillStyle = background.color;
     ctx.fillRect(0, 0, width, height);
+    return;
+  }
+
+  if (background.type === "image") {
+    // Cross-origin images are loaded with CORS so the canvas stays untainted
+    // and `toBlob` can export. Remote presets (Unsplash) send the required
+    // `Access-Control-Allow-Origin` header.
+    const image = await loadImage(background.url);
+    drawImageCover(ctx, image, width, height);
     return;
   }
 
@@ -198,7 +255,7 @@ export async function renderEditedImage(
   if (!ctx) throw new Error("Canvas is not supported in this browser.");
 
   // 1. Background layer.
-  paintBackground(ctx, canvas.width, canvas.height, background);
+  await paintBackground(ctx, canvas.width, canvas.height, background);
 
   // 2. Enhanced subject layer.
   ctx.filter = buildFilter(adjustments);
