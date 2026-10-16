@@ -55,9 +55,17 @@ export async function middleware(request: NextRequest) {
 
   // IMPORTANT: use getUser() (never getSession()) so the token is validated
   // and refreshed against Supabase on every request.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const {
+      data: { user: fetchedUser },
+    } = await supabase.auth.getUser();
+    user = fetchedUser;
+  } catch (err) {
+    // Supabase unreachable or returned malformed data — fail open rather than
+    // 500-ing every route. Protected pages still re-check the session server-side.
+    console.error("Middleware getUser() failed:", err);
+  }
 
   // Gate authenticated-only routes. Unauthenticated visitors are bounced to
   // the login page with a `next` param so they land where they intended.

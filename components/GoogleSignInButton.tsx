@@ -31,27 +31,29 @@ export function GoogleSignInButton() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/callback`;
-      console.log("[GoogleSignIn] starting signInWithOAuth", {
-        redirectTo,
-        origin: window.location.origin,
-      });
+
+      // window.location.origin is the correct choice in production: the OAuth
+      // redirect must return to the exact host the user is browsing, otherwise
+      // the PKCE verifier cookie (written by this browser) won't be found.
+      // NEXT_PUBLIC_SITE_URL is only a fallback for non-browser environments.
+      const origin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/+$/, "");
+
+      const redirectTo = `${origin}/auth/callback`;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo },
       });
 
-      console.log("[GoogleSignIn] signInWithOAuth response", { data, error });
-      if (error) {
-        console.error("[GoogleSignIn] signInWithOAuth error", error);
-        throw error;
-      }
-      // On success Supabase redirects the full page to Google; if `data.url`
-      // is missing the redirect never happens, so log it explicitly.
+      if (error) throw error;
+
+      // On success Supabase redirects the full page to Google. If `data.url`
+      // is missing the redirect never happens, so surface it.
       if (!data?.url) {
-        console.error("[GoogleSignIn] no OAuth URL returned", data);
-      } else {
-        console.log("[GoogleSignIn] redirecting to provider URL", data.url);
+        throw new Error("Google sign-in did not return a redirect URL.");
       }
     } catch (err) {
       console.error("[GoogleSignIn] sign-in failed", err);

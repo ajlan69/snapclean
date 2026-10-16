@@ -6,12 +6,12 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Toaster } from "sonner";
 
-import { getAppBaseUrl } from "@/lib/app-url";
+import { getAppBaseUrl, getMetadataBase } from "@/lib/app-url";
 
 const appUrl = getAppBaseUrl();
 
 export const metadata: Metadata = {
-  metadataBase: new URL(appUrl),
+  metadataBase: getMetadataBase(),
   title: {
     default: "SnapClean — Remove Backgrounds in 1 Click",
     template: "%s · SnapClean",

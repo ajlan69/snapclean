@@ -20,46 +20,92 @@ export async function GET(request: Request) {
   const oauthError = searchParams.get("error");
   const oauthErrorDescription = searchParams.get("error_description");
 
-  if (code) {
-    console.log("Callback hit, exchanging code...");
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Called from a Server Component — safe to ignore when middleware
-              // is responsible for refreshing the session.
-            }
-          },
-        },
-      }
-    );
+  const redirectBase = getRedirectBase(origin);
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+  if (!code) {
+    if (oauthError) {
+      console.error(
+        `Callback OAuth error: ${oauthError}${
+          oauthErrorDescription ? ` — ${oauthErrorDescription}` : ""
+        }`
+      );
+    } else {
+      console.error("Callback hit without a `code` parameter.");
     }
-
-    console.error("Exchange error:", error);
-  } else if (oauthError) {
-    console.error(
-      `Callback OAuth error: ${oauthError}${
-        oauthErrorDescription ? ` — ${oauthErrorDescription}` : ""
-      }`
-    );
+    return NextResponse.redirect(`${redirectBase}/login?error=auth`);
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error(
+      "Callback misconfigured: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set."
+    );
+    return NextResponse.redirect(`${redirectBase}/login?error=auth`);
+  }
+
+  try {
+    console.log("Callback hit, exchanging code...");
+
+    const cookieStore = cookies();
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Called from a Server Component — safe to ignore when middleware
+            // is responsible for refreshing the session.
+          }
+        },
+      },
+    });
+
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      console.error("Exchange error:", error);
+      return NextResponse.redirect(`${redirectBase}/login?error=auth`);
+    }
+
+    return NextResponse.redirect(`${redirectBase}${next}`);
+  } catch (err) {
+    // Network/parse failures from exchangeCodeForSession throw rather than
+    // returning an `error`; catch them so the route never 500s.
+    console.error("Unhandled error during code exchange:", err);
+    return NextResponse.redirect(`${redirectBase}/login?error=auth`);
+  }
+}
+
+/**
+ * Base URL for post-callback redirects. Prefer the origin the request actually
+ * arrived on so the session cookie it just wrote is sent back to the same host;
+ * fall back to the configured site URL if the origin looks unusable.
+ */
+function getRedirectBase(origin: string): string {
+  try {
+    const parsed = new URL(origin);
+    if (parsed.hostname) return parsed.origin;
+  } catch {
+    // fall through
+  }
+
+  const configured =
+    process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (configured) {
+    const trimmed = configured.replace(/\/+$/, "");
+    return /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+  }
+
+  return origin;
 }
 
 /** Only allow same-site, path-only redirects (prevents open redirects). */
