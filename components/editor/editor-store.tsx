@@ -27,26 +27,32 @@ import {
   guestHasQuota,
   incrementGuestUsage,
 } from "@/lib/usage";
-import {
-  isLowMemoryDevice,
-  isMattingSupported,
-  removeBackgroundRMBG,
-} from "@/lib/matting";
+import { featherAlpha } from "@/lib/feather";
 import type { Plan } from "@/lib/types";
 
 // Pinned to the same version as package.json. Served as a native ES module.
 const BACKGROUND_REMOVAL_CDN_URL =
   "https://esm.sh/@imgly/background-removal@1.7.0";
 
-/** Human-readable labels for the matting worker's progress stages. */
-const MATTING_STAGE_LABELS: Record<string, string> = {
-  "downloading-model": "Downloading AI model…",
-  "initializing-model": "Initializing neural engine…",
-  preprocessing: "Preparing image…",
-  inference: "Removing background…",
-  refining: "Refining hair & edges…",
-  complete: "Finalizing…",
-};
+/**
+ * imgly model used by "High Quality" mode. The fp16 ISNet weights resolve hair
+ * and fur edges noticeably better than the default low-precision model, while
+ * still running entirely on-device.
+ */
+const HIGH_QUALITY_MODEL = "isnet_fp16" as const;
+const STANDARD_MODEL = "isnet" as const;
+
+const DEFAULT_EDGE_SMOOTHING = 1;
+
+/** Whether the browser can run the on-device cutout pipeline. */
+function canRunCutout(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof Worker !== "undefined" &&
+    typeof WebAssembly !== "undefined" &&
+    typeof createImageBitmap === "function"
+  );
+}
 
 export type EditorStatus = "idle" | "processing" | "ready" | "error";
 
@@ -80,11 +86,9 @@ interface EditorContextValue extends EditorSnapshot {
   highQuality: boolean;
   hqSupported: boolean;
   setHighQuality: (enabled: boolean) => void;
-  /** Guided-filter radius (0–3 px) applied to cutout edges. */
+  /** Feather radius (0–3 px) applied to the cutout alpha mask. */
   edgeSmoothing: number;
   setEdgeSmoothing: (value: number) => void;
-  /** Execution provider the matting model ended up on, once known. */
-  mattingDevice: "webgpu" | "wasm" | null;
   file: File | null;
   originalUrl: string | null;
   processedUrl: string | null;
@@ -102,7 +106,7 @@ interface EditorContextValue extends EditorSnapshot {
   handleFile: (file: File) => void;
   handleDownload: () => void;
   reset: () => void;
-  reprocess: (options?: { edgeSmoothing?: number }) => void;
+  reprocess: () => void;
 
   /** Live (throttled) slider preview — does not touch history. */
   previewAdjustment: (key: keyof Adjustments, value: number) => void;
@@ -147,10 +151,9 @@ export function EditorProvider({
   const [progressLabel, setProgressLabel] = useState("Removing background…");
   const [highQuality, setHighQualityState] = useState(true);
   const [hqSupported, setHqSupported] = useState(true);
-  const [edgeSmoothing, setEdgeSmoothingState] = useState(1);
-  const [mattingDevice, setMattingDevice] = useState<
-    "webgpu" | "wasm" | null
-  >(null);
+  const [edgeSmoothing, setEdgeSmoothingState] = useState(
+    DEFAULT_EDGE_SMOOTHING
+  );
   const [file, setFile] = useState<File | null>(null);
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
@@ -167,6 +170,10 @@ export function EditorProvider({
 
   const originalUrlRef = useRef<string | null>(null);
   const autoProcessed = useRef(false);
+  // The raw model cutout, kept so edge feathering can be re-applied instantly
+  // without re-running the (expensive) model.
+  const rawCutoutRef = useRef<Blob | null>(null);
+  const edgeSmoothingRef = useRef(DEFAULT_EDGE_SMOOTHING);
 
   // requestAnimationFrame throttle for live slider previews.
   const rafRef = useRef<number | null>(null);
@@ -192,7 +199,7 @@ export function EditorProvider({
   }, []);
 
   useEffect(() => {
-    setHqSupported(isMattingSupported());
+    setHqSupported(canRunCutout());
   }, []);
 
   const canProcess = useCallback(async (): Promise<boolean> => {
@@ -254,61 +261,36 @@ export function EditorProvider({
 
   /** Run AI background removal on a file, resetting edits on success. */
   const runRemoval = useCallback(
-    async (input: File, smoothing = edgeSmoothing): Promise<Blob | null> => {
+    async (input: File): Promise<Blob | null> => {
       setStatus("processing");
       setProgress(0);
       setHistory({ past: [], present: INITIAL_SNAPSHOT, future: [] });
 
-      const useHighQuality = highQuality && isMattingSupported();
-
-      if (useHighQuality) {
-        try {
-          setProgressLabel("Preparing high-quality cutout…");
-          const output = await removeBackgroundRMBG(input, {
-            edgeSmoothing: smoothing,
-            onProgress: (p) => {
-              setProgressLabel(
-                MATTING_STAGE_LABELS[p.stage] ?? "Processing…"
-              );
-              setProgress((prev) =>
-                Math.max(prev, Math.round(p.progress * 100))
-              );
-              if (p.device) setMattingDevice(p.device);
-            },
-          });
-
-          setProcessedBlob(output);
-          setProgress(100);
-          setStatus("ready");
-          return output;
-        } catch (err) {
-          console.warn(
-            "[matting] high-quality removal failed, falling back to standard",
-            err
-          );
-          toast.message(
-            "High-quality mode unavailable — using the standard remover."
-          );
-        }
-      }
-
       try {
-        setProgressLabel("Removing background…");
+        setProgressLabel(
+          highQuality ? "Loading high-quality model…" : "Removing background…"
+        );
         const { removeBackground } = (await import(
           /* webpackIgnore: true */ BACKGROUND_REMOVAL_CDN_URL
         )) as typeof import("@imgly/background-removal");
 
-        const output = await removeBackground(input, {
+        const raw = await removeBackground(input, {
+          model: highQuality ? HIGH_QUALITY_MODEL : STANDARD_MODEL,
           progress: (_key, current, total) => {
             const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-            setProgress((prev) => Math.max(prev, Math.min(99, pct)));
+            setProgress((prev) => Math.max(prev, Math.min(95, pct)));
           },
         });
 
-        setProcessedBlob(output);
+        rawCutoutRef.current = raw;
+
+        setProgressLabel("Refining edges…");
+        const feathered = await featherAlpha(raw, edgeSmoothingRef.current);
+
+        setProcessedBlob(feathered);
         setProgress(100);
         setStatus("ready");
-        return output;
+        return feathered;
       } catch (err) {
         console.error("Background removal failed", err);
         setStatus("error");
@@ -316,7 +298,7 @@ export function EditorProvider({
         return null;
       }
     },
-    [highQuality, edgeSmoothing]
+    [highQuality]
   );
 
   const handleFile = useCallback(
@@ -341,15 +323,20 @@ export function EditorProvider({
     [canProcess, recordUsage, runRemoval]
   );
 
+  /** Re-apply feathering to the cached cutout (no model re-run, no quota). */
+  const refeather = useCallback(async (value: number) => {
+    const raw = rawCutoutRef.current;
+    if (!raw) return;
+    const feathered = await featherAlpha(raw, value);
+    setProcessedBlob(feathered);
+  }, []);
+
   /** Re-run the AI cutout on the current file (no extra quota consumed). */
-  const reprocess = useCallback(
-    async (options?: { edgeSmoothing?: number }) => {
-      if (!file) return;
-      const output = await runRemoval(file, options?.edgeSmoothing);
-      if (output) toast.success("Cutout refreshed");
-    },
-    [file, runRemoval]
-  );
+  const reprocess = useCallback(async () => {
+    if (!file) return;
+    const output = await runRemoval(file);
+    if (output) toast.success("Cutout refreshed");
+  }, [file, runRemoval]);
 
   const handleDownload = useCallback(async () => {
     if (!processedBlob) {
@@ -382,6 +369,7 @@ export function EditorProvider({
   const reset = useCallback(() => {
     if (originalUrlRef.current) URL.revokeObjectURL(originalUrlRef.current);
     originalUrlRef.current = null;
+    rawCutoutRef.current = null;
     setFile(null);
     setOriginalUrl(null);
     setProcessedBlob(null);
@@ -479,16 +467,17 @@ export function EditorProvider({
 
   const setHighQuality = useCallback((enabled: boolean) => {
     setHighQualityState(enabled);
-    if (enabled && isLowMemoryDevice()) {
-      toast.warning(
-        "High Quality uses a lot of memory and may be slow on this device."
-      );
-    }
   }, []);
 
-  const setEdgeSmoothing = useCallback((value: number) => {
-    setEdgeSmoothingState(Math.max(0, Math.min(3, value)));
-  }, []);
+  const setEdgeSmoothing = useCallback(
+    (value: number) => {
+      const next = Math.max(0, Math.min(3, Math.round(value)));
+      edgeSmoothingRef.current = next;
+      setEdgeSmoothingState(next);
+      void refeather(next);
+    },
+    [refeather]
+  );
 
   // Auto-process a file handed off from the landing page (runs once).
   useEffect(() => {
@@ -520,7 +509,6 @@ export function EditorProvider({
       setHighQuality,
       edgeSmoothing,
       setEdgeSmoothing,
-      mattingDevice,
       file,
       originalUrl,
       processedUrl,
@@ -559,7 +547,6 @@ export function EditorProvider({
       setHighQuality,
       edgeSmoothing,
       setEdgeSmoothing,
-      mattingDevice,
       file,
       originalUrl,
       processedUrl,

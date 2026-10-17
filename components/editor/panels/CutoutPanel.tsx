@@ -10,11 +10,11 @@ import { useEditor } from "@/components/editor/editor-store";
 import { cn } from "@/lib/utils";
 
 /**
- * Guided-filter radius control. Applied by the matting worker when it runs, so
- * changing it re-runs the cutout (no extra quota consumed).
+ * Feather radius control. Applied to the cutout's alpha mask only, so the
+ * subject pixels stay crisp. Updates instantly from the cached cutout.
  */
 function EdgeSmoothingControl() {
-  const { edgeSmoothing, setEdgeSmoothing, reprocess, status, highQuality, file } =
+  const { edgeSmoothing, setEdgeSmoothing, status, highQuality, file } =
     useEditor();
   const [value, setValue] = useState(edgeSmoothing);
 
@@ -25,7 +25,6 @@ function EdgeSmoothingControl() {
     const next = values[0];
     setValue(next);
     setEdgeSmoothing(next);
-    if (!disabled) reprocess({ edgeSmoothing: next });
   };
 
   return (
@@ -55,8 +54,8 @@ function EdgeSmoothingControl() {
         aria-label="Edge smoothing"
       />
       <p className="mt-2 text-xs text-muted-foreground">
-        Softens mask edges to keep flyaway hair and fur. Higher values blur the
-        cutout outline — re-runs when you release the handle.
+        Feathers the cutout edge to keep hair and fur soft. Only the alpha mask
+        is blurred — your subject stays sharp.
       </p>
     </div>
   );
