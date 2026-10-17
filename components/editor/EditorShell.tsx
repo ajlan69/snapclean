@@ -26,10 +26,10 @@ import {
   EditorSidebar,
   MobileToolSheet,
 } from "@/components/editor/EditorSidebar";
+import { AIProcessingOverlay } from "@/components/editor/AIProcessingOverlay";
 import { useEditor } from "@/components/editor/editor-store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -246,8 +246,6 @@ function ProfileMenu({
 function EditorCanvas() {
   const {
     status,
-    progress,
-    progressLabel,
     originalUrl,
     processedUrl,
     adjustments,
@@ -285,17 +283,7 @@ function EditorCanvas() {
               alt="Processing"
               className="h-full w-full object-contain opacity-40 blur-sm"
             />
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/60 backdrop-blur-sm">
-              <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">
-                {progressLabel}
-                {progress > 0 ? ` ${progress}%` : ""}
-              </p>
-              <Progress value={progress} className="w-2/3" />
-              <p className="text-xs text-muted-foreground">
-                Runs entirely on your device
-              </p>
-            </div>
+            <AIProcessingOverlay />
           </motion.div>
         )}
 
