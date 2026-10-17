@@ -28,15 +28,25 @@ import {
   incrementGuestUsage,
 } from "@/lib/usage";
 import {
-  isHighQualitySupported,
   isLowMemoryDevice,
-  removeBackgroundHighQuality,
-} from "@/lib/birefnet";
+  isMattingSupported,
+  removeBackgroundRMBG,
+} from "@/lib/matting";
 import type { Plan } from "@/lib/types";
 
 // Pinned to the same version as package.json. Served as a native ES module.
 const BACKGROUND_REMOVAL_CDN_URL =
   "https://esm.sh/@imgly/background-removal@1.7.0";
+
+/** Human-readable labels for the matting worker's progress stages. */
+const MATTING_STAGE_LABELS: Record<string, string> = {
+  "downloading-model": "Downloading AI model…",
+  "initializing-model": "Initializing neural engine…",
+  preprocessing: "Preparing image…",
+  inference: "Removing background…",
+  refining: "Refining hair & edges…",
+  complete: "Finalizing…",
+};
 
 export type EditorStatus = "idle" | "processing" | "ready" | "error";
 
@@ -70,6 +80,11 @@ interface EditorContextValue extends EditorSnapshot {
   highQuality: boolean;
   hqSupported: boolean;
   setHighQuality: (enabled: boolean) => void;
+  /** Guided-filter radius (0–3 px) applied to cutout edges. */
+  edgeSmoothing: number;
+  setEdgeSmoothing: (value: number) => void;
+  /** Execution provider the matting model ended up on, once known. */
+  mattingDevice: "webgpu" | "wasm" | null;
   file: File | null;
   originalUrl: string | null;
   processedUrl: string | null;
@@ -87,7 +102,7 @@ interface EditorContextValue extends EditorSnapshot {
   handleFile: (file: File) => void;
   handleDownload: () => void;
   reset: () => void;
-  reprocess: () => void;
+  reprocess: (options?: { edgeSmoothing?: number }) => void;
 
   /** Live (throttled) slider preview — does not touch history. */
   previewAdjustment: (key: keyof Adjustments, value: number) => void;
@@ -130,8 +145,12 @@ export function EditorProvider({
   const [status, setStatus] = useState<EditorStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("Removing background…");
-  const [highQuality, setHighQualityState] = useState(false);
+  const [highQuality, setHighQualityState] = useState(true);
   const [hqSupported, setHqSupported] = useState(true);
+  const [edgeSmoothing, setEdgeSmoothingState] = useState(1);
+  const [mattingDevice, setMattingDevice] = useState<
+    "webgpu" | "wasm" | null
+  >(null);
   const [file, setFile] = useState<File | null>(null);
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
@@ -173,7 +192,7 @@ export function EditorProvider({
   }, []);
 
   useEffect(() => {
-    setHqSupported(isHighQualitySupported());
+    setHqSupported(isMattingSupported());
   }, []);
 
   const canProcess = useCallback(async (): Promise<boolean> => {
@@ -235,29 +254,27 @@ export function EditorProvider({
 
   /** Run AI background removal on a file, resetting edits on success. */
   const runRemoval = useCallback(
-    async (input: File): Promise<Blob | null> => {
+    async (input: File, smoothing = edgeSmoothing): Promise<Blob | null> => {
       setStatus("processing");
       setProgress(0);
       setHistory({ past: [], present: INITIAL_SNAPSHOT, future: [] });
 
-      const useHighQuality = highQuality && isHighQualitySupported();
+      const useHighQuality = highQuality && isMattingSupported();
 
       if (useHighQuality) {
         try {
-          setProgressLabel("Downloading high-quality AI model…");
-          const output = await removeBackgroundHighQuality(input, (p) => {
-            if (p.phase === "model") {
-              setProgressLabel("Downloading high-quality AI model…");
-              const { loaded = 0, total = 0 } = p;
-              if (total > 0) {
-                setProgress((prev) =>
-                  Math.max(prev, Math.min(80, Math.round((loaded / total) * 80)))
-                );
-              }
-            } else {
-              setProgressLabel("Applying high-quality matting…");
-              setProgress((prev) => Math.max(prev, 85));
-            }
+          setProgressLabel("Preparing high-quality cutout…");
+          const output = await removeBackgroundRMBG(input, {
+            edgeSmoothing: smoothing,
+            onProgress: (p) => {
+              setProgressLabel(
+                MATTING_STAGE_LABELS[p.stage] ?? "Processing…"
+              );
+              setProgress((prev) =>
+                Math.max(prev, Math.round(p.progress * 100))
+              );
+              if (p.device) setMattingDevice(p.device);
+            },
           });
 
           setProcessedBlob(output);
@@ -266,7 +283,7 @@ export function EditorProvider({
           return output;
         } catch (err) {
           console.warn(
-            "[birefnet] high-quality removal failed, falling back to standard",
+            "[matting] high-quality removal failed, falling back to standard",
             err
           );
           toast.message(
@@ -299,7 +316,7 @@ export function EditorProvider({
         return null;
       }
     },
-    [highQuality]
+    [highQuality, edgeSmoothing]
   );
 
   const handleFile = useCallback(
@@ -325,11 +342,14 @@ export function EditorProvider({
   );
 
   /** Re-run the AI cutout on the current file (no extra quota consumed). */
-  const reprocess = useCallback(async () => {
-    if (!file) return;
-    const output = await runRemoval(file);
-    if (output) toast.success("Cutout refreshed");
-  }, [file, runRemoval]);
+  const reprocess = useCallback(
+    async (options?: { edgeSmoothing?: number }) => {
+      if (!file) return;
+      const output = await runRemoval(file, options?.edgeSmoothing);
+      if (output) toast.success("Cutout refreshed");
+    },
+    [file, runRemoval]
+  );
 
   const handleDownload = useCallback(async () => {
     if (!processedBlob) {
@@ -457,17 +477,18 @@ export function EditorProvider({
     toast.error(`${feature} is a Pro feature.`);
   }, []);
 
-  const setHighQuality = useCallback(
-    (enabled: boolean) => {
-      setHighQualityState(enabled);
-      if (enabled && isLowMemoryDevice()) {
-        toast.warning(
-          "High Quality uses a lot of memory and may be slow on this device."
-        );
-      }
-    },
-    []
-  );
+  const setHighQuality = useCallback((enabled: boolean) => {
+    setHighQualityState(enabled);
+    if (enabled && isLowMemoryDevice()) {
+      toast.warning(
+        "High Quality uses a lot of memory and may be slow on this device."
+      );
+    }
+  }, []);
+
+  const setEdgeSmoothing = useCallback((value: number) => {
+    setEdgeSmoothingState(Math.max(0, Math.min(3, value)));
+  }, []);
 
   // Auto-process a file handed off from the landing page (runs once).
   useEffect(() => {
@@ -497,6 +518,9 @@ export function EditorProvider({
       highQuality,
       hqSupported,
       setHighQuality,
+      edgeSmoothing,
+      setEdgeSmoothing,
+      mattingDevice,
       file,
       originalUrl,
       processedUrl,
@@ -533,6 +557,9 @@ export function EditorProvider({
       highQuality,
       hqSupported,
       setHighQuality,
+      edgeSmoothing,
+      setEdgeSmoothing,
+      mattingDevice,
       file,
       originalUrl,
       processedUrl,

@@ -28,6 +28,18 @@ const nextConfig = {
       },
     ];
   },
+  webpack(config) {
+    // We reuse only the pure matting math from `@pixir/background-remover`
+    // (bilinear reconstruction + guided filter). ONNX Runtime itself is loaded
+    // from the CDN via importScripts inside `workers/matting.worker.ts`, so its
+    // `onnxruntime-web` import is aliased away to keep it out of the bundle
+    // (and out of the worker, which would break webpack's worker handling).
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      "onnxruntime-web": false,
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

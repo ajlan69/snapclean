@@ -1,14 +1,71 @@
 "use client";
 
-import { Eraser, Lock, RefreshCw, ScanFace } from "lucide-react";
+import { useState } from "react";
+import { Eraser, Lock, RefreshCw, ScanFace, Wand2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { HighQualityToggle } from "@/components/editor/HighQualityToggle";
 import { useEditor } from "@/components/editor/editor-store";
+import { cn } from "@/lib/utils";
+
+/**
+ * Guided-filter radius control. Applied by the matting worker when it runs, so
+ * changing it re-runs the cutout (no extra quota consumed).
+ */
+function EdgeSmoothingControl() {
+  const { edgeSmoothing, setEdgeSmoothing, reprocess, status, highQuality, file } =
+    useEditor();
+  const [value, setValue] = useState(edgeSmoothing);
+
+  const busy = status === "processing";
+  const disabled = !highQuality || !file || busy;
+
+  const handleCommit = (values: number[]) => {
+    const next = values[0];
+    setValue(next);
+    setEdgeSmoothing(next);
+    if (!disabled) reprocess({ edgeSmoothing: next });
+  };
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border p-3 transition-opacity",
+        disabled && "opacity-60"
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="flex items-center gap-2 font-medium">
+          <Wand2 className="h-4 w-4 text-primary" />
+          Edge Smoothing
+        </span>
+        <span className="tabular-nums text-muted-foreground">
+          {value === 0 ? "Off" : `${value}px`}
+        </span>
+      </div>
+      <Slider
+        min={0}
+        max={3}
+        step={1}
+        value={[value]}
+        disabled={disabled}
+        onValueChange={(values) => setValue(values[0])}
+        onValueCommit={handleCommit}
+        aria-label="Edge smoothing"
+      />
+      <p className="mt-2 text-xs text-muted-foreground">
+        Softens mask edges to keep flyaway hair and fur. Higher values blur the
+        cutout outline — re-runs when you release the handle.
+      </p>
+    </div>
+  );
+}
 
 /** AI cutout tab: shows the isolated subject and lets users re-run removal. */
 export default function CutoutPanel() {
-  const { status, processedUrl, file, reprocess, requirePro } = useEditor();
+  const { status, processedUrl, file, reprocess, requirePro, highQuality } =
+    useEditor();
 
   const ready = status === "ready" && Boolean(processedUrl);
   const processing = status === "processing";
@@ -16,6 +73,8 @@ export default function CutoutPanel() {
   return (
     <div className="space-y-4">
       <HighQualityToggle />
+
+      {highQuality && <EdgeSmoothingControl />}
 
       <p className="text-sm text-muted-foreground">
         The AI cutout isolates your subject automatically and runs entirely on
