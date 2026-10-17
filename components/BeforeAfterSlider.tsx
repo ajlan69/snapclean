@@ -12,8 +12,6 @@ interface BeforeAfterSliderProps {
   afterFilter?: string;
   /** Background painted behind the processed subject. */
   background?: BackgroundOption;
-  /** When true, a "Made with SnapClean" badge is overlaid (free tier). */
-  watermark?: boolean;
   className?: string;
 }
 
@@ -30,7 +28,6 @@ export function BeforeAfterSlider({
   after,
   afterFilter,
   background,
-  watermark = false,
   className,
 }: BeforeAfterSliderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -117,13 +114,6 @@ export function BeforeAfterSlider({
       <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-primary/90 px-2.5 py-1 text-xs font-medium text-white">
         After
       </span>
-
-      {/* Watermark preview (mirrors the burned-in export watermark). */}
-      {watermark && (
-        <span className="pointer-events-none absolute bottom-3 right-3 rounded bg-black/35 px-2 py-1 text-xs font-semibold text-white/90">
-          Made with SnapClean
-        </span>
-      )}
     </div>
   );
 }

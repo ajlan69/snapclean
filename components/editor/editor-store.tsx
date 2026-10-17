@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import {
   DEFAULT_ADJUSTMENTS,
+  FREE_EXPORT_MAX_DIMENSION,
   createThumbnail,
   downloadBlob,
   outputFilename,
@@ -341,11 +342,12 @@ export function EditorProvider({
       const blob = await renderEditedImage(processedBlob, {
         adjustments,
         background,
-        watermark: !isPro,
-        maxDimension: isPro ? undefined : 1080,
+        maxDimension: isPro ? undefined : FREE_EXPORT_MAX_DIMENSION,
       });
       downloadBlob(blob, outputFilename(file?.name ?? "image"));
-      toast.success(isPro ? "HD image downloaded" : "Image downloaded");
+      toast.success(
+        isPro ? "Full-resolution image downloaded" : "720p image downloaded"
+      );
     } catch (err) {
       console.error(err);
       toast.error("Download failed. Please try again.");

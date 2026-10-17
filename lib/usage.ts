@@ -2,7 +2,7 @@
 
 import { getDayKey } from "@/lib/utils";
 
-export const FREE_DAILY_LIMIT = 3;
+export const FREE_DAILY_LIMIT = 10;
 const STORAGE_KEY = "snapclean_usage";
 
 export interface LocalUsage {
@@ -53,19 +53,4 @@ export function incrementGuestUsage(now = new Date()): number {
  */
 export function guestHasQuota(now = new Date()): boolean {
   return getGuestUsage(now) < FREE_DAILY_LIMIT;
-}
-
-/**
- * Persist the "Photos processed today" global counter.
- * The counter is aggregated at the source (Supabase) for logged-in users and
- * approximated for guests via a local counter seed that primes the landing page.
- */
-export function readProcessedTodayFallback(): number {
-  if (typeof window === "undefined") return 0;
-  try {
-    const seed = Number(localStorage.getItem("snapclean_processed_seed") ?? "0");
-    return seed;
-  } catch {
-    return 0;
-  }
 }

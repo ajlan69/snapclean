@@ -37,7 +37,7 @@ export function WaitlistDialog({
   defaultEmail = "",
   source = "app",
   title = "Join the Pro waitlist",
-  description = "Pro — unlimited images, HD exports and no watermark — is coming soon. Leave your email and we'll let you know the moment it's ready.",
+  description = "Pro — unlimited images and full-resolution HD exports — is coming soon. Leave your email and we'll let you know the moment it's ready.",
 }: WaitlistDialogProps) {
   const [email, setEmail] = useState(defaultEmail);
   const [loading, setLoading] = useState(false);
@@ -88,7 +88,7 @@ export function WaitlistDialog({
               <DialogTitle>You&apos;re on the waitlist</DialogTitle>
               <DialogDescription>
                 Thanks! We&apos;ll email <strong>{email}</strong> as soon as Pro
-                launches. Until then, enjoy 3 free images every day.
+                launches. Until then, enjoy 10 free images every day.
               </DialogDescription>
             </DialogHeader>
             <Button variant="outline" onClick={() => handleOpenChange(false)}>

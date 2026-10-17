@@ -105,7 +105,7 @@ export function EditorShell() {
           onOpenChange={setShowUpgrade}
           source="editor-quota"
           title="You've reached today's free limit"
-          description={`Free accounts can process ${FREE_DAILY_LIMIT} images per day. Join the Pro waitlist for unlimited images, HD downloads and no watermark.`}
+          description={`Free accounts can process ${FREE_DAILY_LIMIT} images per day. Join the Pro waitlist for unlimited images and full-resolution HD downloads.`}
         />
       </div>
     </TooltipProvider>
@@ -251,7 +251,6 @@ function EditorCanvas() {
     processedUrl,
     adjustments,
     background,
-    isPro,
     handleFile,
     reset,
   } = useEditor();
@@ -312,7 +311,6 @@ function EditorCanvas() {
               after={processedUrl}
               afterFilter={buildFilter(adjustments)}
               background={background}
-              watermark={!isPro}
             />
           </motion.div>
         )}

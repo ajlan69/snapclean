@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ShieldCheck, Zap, Lock } from "lucide-react";
 
 import { HeroUpload } from "@/components/HeroUpload";
-import { HeroCounter } from "@/components/HeroCounter";
+import { DemoSection } from "@/components/DemoSection";
 import { FeatureGrid } from "@/components/FeatureGrid";
 import { PricingTable } from "@/components/PricingTable";
 import { getCurrentProfile } from "@/lib/profile";
@@ -46,17 +46,12 @@ export default async function HomePage() {
             <HeroUpload />
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-            <Zap className="h-4 w-4 text-primary" />
-            <HeroCounter /> photos processed today
-          </div>
-
           <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <Lock className="h-4 w-4" /> Private by design
             </span>
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4" /> No watermarks on Pro
+              <ShieldCheck className="h-4 w-4" /> 10 free images per day
             </span>
             <span className="flex items-center gap-1.5">
               <Zap className="h-4 w-4" /> Instant downloads
@@ -64,6 +59,9 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Demo */}
+      <DemoSection />
 
       {/* Features */}
       <section className="container px-4 py-16 md:py-24">
@@ -87,8 +85,8 @@ export default async function HomePage() {
               Simple, honest pricing
             </h2>
             <p className="mt-3 text-muted-foreground">
-              Start free today — join the waitlist for unlimited,
-              watermark-free HD exports.
+              Start free today — join the waitlist for unlimited, full-resolution
+              HD exports.
             </p>
           </div>
           <div className="mx-auto max-w-4xl">

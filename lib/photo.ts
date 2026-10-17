@@ -179,49 +179,24 @@ async function paintBackground(
 }
 
 /**
- * Draw the "Made with SnapClean" watermark for free users.
+ * Longest-edge cap for free-tier exports (720p-class, ~1280px). Pro exports
+ * are unbounded and keep the original resolution.
  */
-function drawWatermark(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number
-) {
-  const fontSize = Math.max(14, Math.round(width * 0.025));
-  ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
-  ctx.textAlign = "right";
-  ctx.textBaseline = "bottom";
-
-  const text = "Made with SnapClean";
-  const padding = Math.round(fontSize * 0.8);
-  const metrics = ctx.measureText(text);
-
-  // Subtle backdrop for readability on any background.
-  ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
-  ctx.fillRect(
-    width - metrics.width - padding * 2,
-    height - fontSize - padding * 2.4,
-    metrics.width + padding,
-    fontSize + padding * 1.4
-  );
-
-  ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
-  ctx.fillText(text, width - padding, height - padding);
-}
+export const FREE_EXPORT_MAX_DIMENSION = 1280;
 
 export interface RenderOptions {
   adjustments?: Adjustments;
   background?: BackgroundOption;
-  /** When true, a "Made with SnapClean" watermark is burned into the PNG. */
-  watermark?: boolean;
   /**
-   * Cap the longest edge of the exported image. Pro users pass `undefined`
-   * to export at full (HD) resolution.
+   * Cap the longest edge of the exported image. Free users pass
+   * `FREE_EXPORT_MAX_DIMENSION`; Pro users pass `undefined` to export at full
+   * (HD) resolution.
    */
   maxDimension?: number;
 }
 
 /**
- * Compose the final image: optional background, enhancements and watermark.
+ * Compose the final image: optional background and enhancements.
  * Returns a PNG blob ready for download.
  */
 export async function renderEditedImage(
@@ -229,7 +204,6 @@ export async function renderEditedImage(
   {
     adjustments = DEFAULT_ADJUSTMENTS,
     background = { type: "transparent" },
-    watermark = false,
     maxDimension,
   }: RenderOptions = {}
 ): Promise<Blob> {
@@ -261,11 +235,6 @@ export async function renderEditedImage(
   ctx.filter = buildFilter(adjustments);
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
   ctx.filter = "none";
-
-  // 3. Watermark for free tier.
-  if (watermark) {
-    drawWatermark(ctx, canvas.width, canvas.height);
-  }
 
   return canvasToBlob(canvas);
 }

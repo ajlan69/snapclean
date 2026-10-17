@@ -20,7 +20,7 @@ const FEATURES = [
     icon: Download,
     title: "Instant Download",
     description:
-      "Get your transparent PNG immediately. Free users get watermarks — Pro exports clean, full-resolution files.",
+      "Get your transparent PNG immediately. Free exports up to 720p — Pro unlocks clean, full-resolution HD files.",
   },
 ];
 

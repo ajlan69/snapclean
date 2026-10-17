@@ -14,12 +14,12 @@ interface Feature {
 }
 
 const FREE_FEATURES: Feature[] = [
-  { label: "3 images per day", included: true },
+  { label: "10 images per day", included: true },
   { label: "AI background removal", included: true },
   { label: "Basic enhancements", included: true },
   { label: "PNG download", included: true },
-  { label: "Watermark on export", included: false },
-  { label: "HD download", included: false },
+  { label: "720p export (1280px)", included: true },
+  { label: "Full-resolution HD export", included: false },
   { label: "Unlimited images", included: false },
 ];
 
@@ -28,8 +28,8 @@ const PRO_FEATURES: Feature[] = [
   { label: "AI background removal", included: true },
   { label: "Full enhancement suite", included: true },
   { label: "PNG download", included: true },
-  { label: "No watermark", included: true },
-  { label: "HD download", included: true },
+  { label: "Full-resolution HD export", included: true },
+  { label: "No watermarks", included: true },
   { label: "Priority processing", included: true },
 ];
 
@@ -70,7 +70,7 @@ export function PricingTable({ currentPlan = "free" }: PricingTableProps) {
         name="Pro"
         price="$9"
         period="per month"
-        description="For creators who need clean, unlimited, watermark-free exports."
+        description="For creators who need clean, unlimited, full-resolution exports."
         features={PRO_FEATURES}
         highlighted
         cta={
