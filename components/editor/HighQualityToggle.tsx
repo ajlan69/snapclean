@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Cpu, Info, Sparkles, Zap } from "lucide-react";
 
 import {
@@ -16,11 +17,18 @@ export function HighQualityToggle() {
   const { highQuality, setHighQuality, hqSupported, mattingDevice } =
     useEditor();
 
+  // Avoid a server/client hydration mismatch for the capability hint: only
+  // trust WebGPU detection after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const active = highQuality && hqSupported;
   const unavailable = !hqSupported;
   // Prefer the provider the model actually ran on; fall back to a capability
   // hint before the first cutout has run.
-  const gpu = mattingDevice === "webgpu" || (!mattingDevice && supportsWebGPU());
+  const gpu =
+    mattingDevice === "webgpu" ||
+    (mounted && !mattingDevice && supportsWebGPU());
 
   return (
     <div
