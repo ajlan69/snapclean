@@ -14,23 +14,19 @@ interface Feature {
 }
 
 const FREE_FEATURES: Feature[] = [
-  { label: "10 images per day", included: true },
-  { label: "AI background removal", included: true },
-  { label: "Basic enhancements", included: true },
-  { label: "PNG download", included: true },
+  { label: "10 free images/day", included: true },
+  { label: "High Quality AI included", included: true },
+  { label: "Watermark applied", included: true },
   { label: "720p export (1280px)", included: true },
-  { label: "Full-resolution HD export", included: false },
-  { label: "Unlimited images", included: false },
+  { label: "No watermark", included: false },
+  { label: "HD resolution", included: false },
 ];
 
 const PRO_FEATURES: Feature[] = [
   { label: "Unlimited images", included: true },
-  { label: "AI background removal", included: true },
-  { label: "Full enhancement suite", included: true },
-  { label: "PNG download", included: true },
-  { label: "Full-resolution HD export", included: true },
-  { label: "No watermarks", included: true },
-  { label: "Priority processing", included: true },
+  { label: "High Quality AI", included: true },
+  { label: "No Watermark", included: true },
+  { label: "HD Resolution", included: true },
 ];
 
 interface PricingTableProps {

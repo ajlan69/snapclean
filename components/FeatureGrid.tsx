@@ -20,7 +20,7 @@ const FEATURES = [
     icon: Download,
     title: "Instant Download",
     description:
-      "Get your transparent PNG immediately. Free exports up to 720p — Pro unlocks clean, full-resolution HD files.",
+      "Get your transparent PNG immediately. Free exports include a small SnapClean watermark — Pro unlocks clean, full-resolution HD files.",
   },
 ];
 

@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Download,
   ImageUp,
+  Info,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -393,6 +394,12 @@ function EditorBottomBar() {
         <Badge variant="outline" className="hidden sm:inline-flex">
           {usageLabel}
         </Badge>
+        {!isPro && (
+          <span className="hidden items-center gap-1 text-xs text-muted-foreground lg:flex">
+            <Info className="h-3.5 w-3.5 shrink-0" />
+            Watermark will be applied. Upgrade to Pro to remove.
+          </span>
+        )}
         <Button
           onClick={handleDownload}
           disabled={!ready || downloading}

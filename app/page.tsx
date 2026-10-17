@@ -51,7 +51,7 @@ export default async function HomePage() {
               <Lock className="h-4 w-4" /> Private by design
             </span>
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4" /> 10 free images per day
+              <ShieldCheck className="h-4 w-4" /> 10 free images/day
             </span>
             <span className="flex items-center gap-1.5">
               <Zap className="h-4 w-4" /> Instant downloads

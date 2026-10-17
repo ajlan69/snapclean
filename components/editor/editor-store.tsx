@@ -240,7 +240,7 @@ export function EditorProvider({
       setProgress(0);
       setHistory({ past: [], present: INITIAL_SNAPSHOT, future: [] });
 
-      const useHighQuality = highQuality && isPro && isHighQualitySupported();
+      const useHighQuality = highQuality && isHighQualitySupported();
 
       if (useHighQuality) {
         try {
@@ -299,7 +299,7 @@ export function EditorProvider({
         return null;
       }
     },
-    [highQuality, isPro]
+    [highQuality]
   );
 
   const handleFile = useCallback(
@@ -343,10 +343,13 @@ export function EditorProvider({
         adjustments,
         background,
         maxDimension: isPro ? undefined : FREE_EXPORT_MAX_DIMENSION,
+        watermark: !isPro,
       });
       downloadBlob(blob, outputFilename(file?.name ?? "image"));
       toast.success(
-        isPro ? "Full-resolution image downloaded" : "720p image downloaded"
+        isPro
+          ? "Full-resolution image downloaded"
+          : "Image downloaded with watermark"
       );
     } catch (err) {
       console.error(err);
@@ -456,10 +459,6 @@ export function EditorProvider({
 
   const setHighQuality = useCallback(
     (enabled: boolean) => {
-      if (enabled && !isPro) {
-        requirePro("High Quality cutout");
-        return;
-      }
       setHighQualityState(enabled);
       if (enabled && isLowMemoryDevice()) {
         toast.warning(
@@ -467,7 +466,7 @@ export function EditorProvider({
         );
       }
     },
-    [isPro, requirePro]
+    []
   );
 
   // Auto-process a file handed off from the landing page (runs once).

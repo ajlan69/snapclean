@@ -145,6 +145,64 @@ function drawImageCover(
 }
 
 /**
+ * Trace a rounded-rectangle path (works around inconsistent `roundRect`
+ * support across browsers/type libs).
+ */
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+/**
+ * Stamp the free-tier "Made with SnapClean" watermark in the bottom-right
+ * corner. Drawn on a translucent pill so it stays legible over any background
+ * (including transparency).
+ */
+function drawWatermark(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number
+) {
+  const text = "Made with SnapClean";
+  const fontSize = Math.max(14, Math.round(Math.min(width, height) * 0.035));
+
+  ctx.save();
+  ctx.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+
+  const textWidth = ctx.measureText(text).width;
+  const padX = fontSize * 0.7;
+  const padY = fontSize * 0.5;
+  const boxWidth = textWidth + padX * 2;
+  const boxHeight = fontSize + padY * 2;
+  const margin = Math.max(12, Math.round(Math.min(width, height) * 0.03));
+  const x = Math.max(margin, width - boxWidth - margin);
+  const y = Math.max(margin, height - boxHeight - margin);
+
+  ctx.fillStyle = "rgba(17, 17, 19, 0.6)";
+  roundRectPath(ctx, x, y, boxWidth, boxHeight, boxHeight / 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.fillText(text, x + padX, y + boxHeight / 2 + 1);
+  ctx.restore();
+}
+
+/**
  * Paint the selected background behind the (transparent) subject.
  * Only image backgrounds need to load an asset, so this is async.
  */
@@ -193,11 +251,16 @@ export interface RenderOptions {
    * (HD) resolution.
    */
   maxDimension?: number;
+  /**
+   * Stamp the "Made with SnapClean" watermark. Free users get it on every
+   * export (including High Quality cutouts); Pro exports are clean.
+   */
+  watermark?: boolean;
 }
 
 /**
- * Compose the final image: optional background and enhancements.
- * Returns a PNG blob ready for download.
+ * Compose the final image: optional background, enhancements and free-tier
+ * watermark. Returns a PNG blob ready for download.
  */
 export async function renderEditedImage(
   source: Blob | string,
@@ -205,6 +268,7 @@ export async function renderEditedImage(
     adjustments = DEFAULT_ADJUSTMENTS,
     background = { type: "transparent" },
     maxDimension,
+    watermark = false,
   }: RenderOptions = {}
 ): Promise<Blob> {
   const image = await loadImage(source);
@@ -235,6 +299,9 @@ export async function renderEditedImage(
   ctx.filter = buildFilter(adjustments);
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
   ctx.filter = "none";
+
+  // 3. Free-tier watermark (baked in so it can't be removed client-side).
+  if (watermark) drawWatermark(ctx, canvas.width, canvas.height);
 
   return canvasToBlob(canvas);
 }

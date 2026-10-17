@@ -2,7 +2,6 @@
 
 import { Info, Sparkles } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -11,9 +10,9 @@ import {
 import { useEditor } from "@/components/editor/editor-store";
 import { cn } from "@/lib/utils";
 
-/** Pro-gated switch that routes cutouts through the BiRefNet matting model. */
+/** Switch that routes cutouts through the BiRefNet matting model. */
 export function HighQualityToggle() {
-  const { highQuality, setHighQuality, hqSupported, isPro } = useEditor();
+  const { highQuality, setHighQuality, hqSupported } = useEditor();
 
   const active = highQuality && hqSupported;
   const unavailable = !hqSupported;
@@ -29,12 +28,6 @@ export function HighQualityToggle() {
         <div className="flex min-w-0 items-center gap-2">
           <Sparkles className="h-4 w-4 shrink-0 text-primary" />
           <span className="text-sm font-medium">High Quality</span>
-          <Badge
-            variant="secondary"
-            className="text-[10px] uppercase tracking-wide"
-          >
-            Pro
-          </Badge>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -77,9 +70,7 @@ export function HighQualityToggle() {
       <p className="mt-2 text-xs text-muted-foreground">
         {unavailable
           ? "Not supported in this browser."
-          : isPro
-            ? "First run downloads the AI model (~300 MB) and caches it offline. Re-run the cutout to apply."
-            : "Pro feature — join the waitlist to unlock sharper hair and edge detail."}
+          : "First run downloads the AI model (~300 MB) and caches it offline. Re-run the cutout to apply."}
       </p>
     </div>
   );
